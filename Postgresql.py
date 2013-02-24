@@ -207,4 +207,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 						out += ' | '
 				out += "\n"
 		return out
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0d97cc6bcb3d29af4b0e88659ab87bfedcd7c778
