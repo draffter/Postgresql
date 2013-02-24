@@ -20,7 +20,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		self.disconnect()
 
 	def connect(self):
-		self.connection = pg8000.dbapi.connect(user='sn0', host='192.168.16.135', database='pwi2_devel', password='n0wysl4w3k!', socket_timeout=5)
+		self.connection = pg8000.dbapi.connect(user='sn0', host='192.168.*.*', database='devel', password='***', socket_timeout=5)
 
 	def execute(self, sql):
 		self.cursor = self.connection.cursor()
