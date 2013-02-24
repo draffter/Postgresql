@@ -1,0 +1,18 @@
+[
+    {
+        "id": "tools",
+        "children":
+        [
+            {
+                "caption": "Postgresql",
+                "id": "pgroot",
+                "children":
+                [
+                    { "command": "postgresql", "caption": "Run query..." },
+                    { "command": "pgopenconn", "caption": "Open postgres connection" },
+                    { "command": "pgnewconn", "caption": "Create new postgres connection" }
+				]
+			}
+		]
+	}
+]
