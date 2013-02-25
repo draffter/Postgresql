@@ -9,8 +9,8 @@
                 "children":
                 [
                     { "command": "postgresql", "caption": "Run query..." },
-                    { "command": "pgopenconn", "caption": "Open postgres connection" },
-                    { "command": "pgnewconn", "caption": "Create new postgres connection" }
+                    { "command": "connectionchange", "caption": "Change postgres connection..." },
+                    { "command": "editconnection", "caption": "Create or edit new postgres connection" }
 				]
 			}
 		]

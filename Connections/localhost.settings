@@ -1,8 +1,0 @@
-{
-	"user" : "sn0",
-	"host" :"localhost", 
-	"port" : 5432,
-	"database" : "postgres", 
-	"password" : "haslo123", 
-	"socket_timeout" : 5
-}

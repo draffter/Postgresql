@@ -4,7 +4,24 @@ import pg8000
 import os
 import json
 import fnmatch
+import shutil
 from collections import namedtuple
+
+class ConnectionchangeCommand(PostgresqlCommand):
+	settings = None
+	def run(self, view):
+		self.settings = sublime.load_settings('Postgresql.sublime-settings')
+		self.getConnections()
+
+class EditconnectionCommand(PostgresqlCommand):
+	settings = None
+	def run(self, view):
+		self.openPrefConnFile()
+	# otwiera plik z konfiguracją połączenia
+	def openPrefConnFile(self):
+		default_settings_path = os.path.join(sublime.packages_path(), 'Postgresql', 'Postgresql.sublime-settings')
+		sublime.active_window().open_file(default_settings_path)
+
 
 
 class PostgresqlCommand(sublime_plugin.TextCommand):
@@ -12,93 +29,75 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 	connection = None       #ConnectionWrapper
 	cursor = None           #CursorWrapper
 	connParams = None
+	settings = None
 	e = None
+	connectionName = None
 	cFiles = []
 
-	def showErrorMessage(self, mgs):
+	def showErrorMessage(self, msg):
 		if self.e != None:
 			s = "Error {0}".format(str(self.e)) # string
 			utf8str = s.encode("utf-8")
 		else:
 			utf8str = "";
-		sublime.error_message("Could not get preferences\n" + utf8str)
+		sublime.error_message(msg + "\n" + utf8str)
 
 	def run(self, view):
 		self.cFiles = []
 		res = self.getMainConnection()
-		return
+		if res ==  False:
+			print "false"
+		else:
+			print "true"
 		if res == False:
-			self.showErrorMessage('Could not get preferences')
 			return
-		
-		res = self.connect()
-		if res == False:
+
+		resc = self.connect()
+		if resc == False:
 			self.showErrorMessage('Could not connect to database')
 			return
-		print "done"
-		# sel = self.view.sel()[0]
-		# if sel.empty():
-		# 	selection = self.view.substr(sublime.Region(0, self.view.size()))
-		# else:
-		# 	selection = self.view.substr(self.view.sel()[0])
-		# self.connect()
-		# result = self.execute(selection)
-		# if (result != None):
-		# 	self.showResult(result, True)
-		# 	self.disconnect()
+		sel = self.view.sel()[0]
+		if sel.empty():
+			selection = self.view.substr(sublime.Region(0, self.view.size()))
+		else:
+			selection = self.view.substr(self.view.sel()[0])
+		self.connect()
+		result = self.execute(selection)
+		if (result != None):
+			self.showResult(result, True)
+			self.disconnect()
 
+	# pobiera obecnie wybrane połącznenie
 	def getMainConnection(self):
-		settings = sublime.load_settings('postgresql.sublime-settings')
-		cc = settings.get('current_connection')
-		print cc
-		if cc == None:
+		self.settings = sublime.load_settings('Postgresql.sublime-settings')
+		cc = self.settings.get('current_connection')
+		if cc == None or cc == "":
 			return self.getConnections()
 		else:
+			self.connectionName = cc
 			return self.setConnectionParams(cc)
 
 	# zapisuje nowe bieżące połączenie
 	def saveNewMainConnection(self, num):
-		settings = sublime.load_settings('postgresql.sublime-settings')
-		settings.set('current_connection', self.cFiles[num])
-		sublime.save_settings('postgresql.sublime-settings')
+		self.settings.set('current_connection', self.cFiles[num])
+		sublime.save_settings('Postgresql.sublime-settings')
 
 	# pobiera parametry połączenia
 	def setConnectionParams(self, cc):
-		connParamsPath = os.path.join(os.getcwd(), 'Connections', cc + '.settings')
-		with open(connParamsPath,'r') as f:
-			try:
-				self.connParams = json.load(f)
-				return True
-			except Exception, e:
-				raise e 	#TODO
-			finally:
-				f.close()
+		c = self.settings.get('connections')
+		self.connParams = c[cc]
+		return True
 
 	# pobiera listę możliwych połączeń
 	def getConnections(self):
-		cPath = os.path.join(os.getcwd(), 'Connections')		
-		#os.getcwd() się nie sprawdza, najlepiej uzyć w settings wpisu, gdzie zapisywać connections
-		# domyślnie w packages_path()/pgconnections
-		print cPath
-		for path, dirs,files in os.walk(cPath):
-			for filename in fnmatch.filter(files, '*.settings'):
-				self.cFiles.append(filename[:-9]);
-		print self.cFiles
-		if len(self.cFiles) > 0:
-			self.view.window().show_quick_panel(self.cFiles, self.saveNewMainConnection)
-			return True
-		else:
-			return False
-
-	# otwiera plik z konfiguracją połączenia
-	def openPrefConnFile(self, num):
-		if num > -1:
-			path = os.path.join(os.getcwd(), 'Connections', self.cFiles[num] + '.settings')
-			self.view.window().open_file(path)
-
+		self.cFiles = []
+		c = self.settings.get('connections')
+		for key in c:
+			self.cFiles.append(key)
+		self.view.window().show_quick_panel(self.cFiles, self.saveNewMainConnection)
+		return False
 
 	def connect(self):
-		# self.connection = pg8000.dbapi.connect(user='sn0', host='localhost', database='postgres', password='haslo123', socket_timeout=5)
 		try:
 			self.connection = pg8000.dbapi.connect(user=str(self.connParams['user']),port=self.connParams['port'], host=str(self.connParams['host']), database=str(self.connParams['database']), password=str(self.connParams['password']), socket_timeout=self.connParams['socket_timeout'])
 		except Exception, self.e:
@@ -108,8 +107,15 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 
 	def execute(self, sql):
 		try:
-			self.cursor.execute(sql.decode('utf-8'))
-			self.connection.commit()
+			if self.settings.get('show_confirm') == True:
+				if sublime.ok_cancel_dialog("You are using '"+self.connectionName+"' connection.\nContinue?"):
+					self.cursor.execute(sql.decode('utf-8'))
+					self.connection.commit()
+				else:
+					return None
+			else:
+				self.cursor.execute(sql.decode('utf-8'))
+				self.connection.commit()
 		except Exception, e:
 			self.disconnect()
 			s = "Error {0}".format(str(e)) # string
@@ -142,7 +148,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			return
 
 		view = sublime.active_window().new_file()
-		view.set_name('PG result')
+		view.set_name('PG result for '+self.connectionName)
 		edit = view.begin_edit()
 		if isOk:
 			pResult = self.prepareOutView(result)
@@ -163,12 +169,19 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 				if col == None:
 					sRow.append(' ')
 				else:
-					if isinstance(col, int):
-						sRow.append(str(col).encode('utf-8'))
-					else:
+					# print type(col)
+					# if isinstance(col, unicode):
+					# 	print col.encode('utf-8')
+					# else:
+					# 	print col
+					# print "+++++++++++++++"
+					if isinstance(col, unicode):
 						sRow.append(col.encode('utf-8'))
+					elif isinstance(col, str):
+						sRow.append(col)
+					else:
+						sRow.append(str(col).encode('utf-8'))
 			data.append(RowTable(*sRow))
-
 		ret = self.pprinttable(data)
 		return ret
 
@@ -207,7 +220,4 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 						out += ' | '
 				out += "\n"
 		return out
-<<<<<<< HEAD
 
-=======
->>>>>>> 0d97cc6bcb3d29af4b0e88659ab87bfedcd7c778
