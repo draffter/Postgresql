@@ -2,10 +2,13 @@
 import sublime, sublime_plugin
 import pg8000
 import os
+import re
 import json
 import fnmatch
 import shutil
 from collections import namedtuple
+import collections
+
 
 class ConnectionchangeCommand(PostgresqlCommand):
 	settings = None
@@ -21,8 +24,6 @@ class EditconnectionCommand(PostgresqlCommand):
 	def openPrefConnFile(self):
 		default_settings_path = os.path.join(sublime.packages_path(), 'Postgresql', 'Postgresql.sublime-settings')
 		sublime.active_window().open_file(default_settings_path)
-
-
 
 class PostgresqlCommand(sublime_plugin.TextCommand):
 	settingsPath = ''
@@ -106,21 +107,24 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		self.cursor = self.connection.cursor()
 
 	def execute(self, sql):
+		if 'schema' in self.connParams and self.connParams['schema'] != "":
+			self.cursor.execute("set search_path = '"+ self.connParams['schema'] +"'")
+
 		try:
 			if self.settings.get('show_confirm') == True:
 				if sublime.ok_cancel_dialog("You are using '"+self.connectionName+"' connection.\nContinue?"):
-					self.cursor.execute(sql.decode('utf-8'))
+					self.cursor.execute(sql.encode('utf-8'))
 					self.connection.commit()
 				else:
 					return None
 			else:
-				self.cursor.execute(sql.decode('utf-8'))
+				self.cursor.execute(sql.encode('utf-8'))
 				self.connection.commit()
 		except Exception, e:
 			self.disconnect()
 			s = "Error {0}".format(str(e)) # string
 			utf8str = s.encode("utf-8")
-			self.showResult('Error in SQL' + utf8str + "\nSQL:\n\t'" + sql.decode('utf-8') +"'", False)
+			self.showResult('Error in SQL' + utf8str + "\nSQL:\n\t'" + sql.encode('utf-8') +"'", False)
 			return None
 		else:
 			if self.cursor.rowcount > 0 :
@@ -148,6 +152,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			return
 
 		view = sublime.active_window().new_file()
+		view.settings().set('word_wrap', False)
 		view.set_name('PG result for '+self.connectionName)
 		edit = view.begin_edit()
 		if isOk:
@@ -157,11 +162,26 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		view.insert(edit, 0, pResult.decode('utf-8'))
 		view.end_edit(edit)
 
+	# dodaje do nazwy kolumny "_n" aby nie było problemów z listą
+	def prepareColumnNames(self, cName):
+		nName = []
+		cnt = collections.defaultdict(list)
+		for name in cName:
+			if name in cnt:
+				cnt[name] += 1
+			else:
+				cnt[name] = 1
+			if cnt[name] > 1:
+				_name = name + "_"+str((cnt[name]-1))
+				name = _name
+			nName.append(name)
+		return nName
+
 	# przygotowanie tabeli
 	def prepareOutView(self, result):
 		data = []
 		cNames = self.getColumnNames()
-		RowTable = namedtuple('RowTable',cNames)
+		RowTable = namedtuple('RowTable',self.prepareColumnNames(cNames))
 		ret = ''
 		for row in result:
 			sRow = []
@@ -169,12 +189,6 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 				if col == None:
 					sRow.append(' ')
 				else:
-					# print type(col)
-					# if isinstance(col, unicode):
-					# 	print col.encode('utf-8')
-					# else:
-					# 	print col
-					# print "+++++++++++++++"
 					if isinstance(col, unicode):
 						sRow.append(col.encode('utf-8'))
 					elif isinstance(col, str):
@@ -188,10 +202,13 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 	#rysowanie tabeli
 	def pprinttable(self,rows):
 		out = ''
+		out += ("Result for connection: " + self.connectionName +"\n").encode('utf-8')
+		out += ("Affected rows: " + str(self.cursor.rowcount) + "\n\n").encode('utf-8')
+
 		if len(rows) > 0:
 			headers = rows[0]._fields
 			lens = []
-			for i in range(len(rows[0])):		#szerokosc kolumn
+			for i in range(len(rows[0])):       #szerokosc kolumn
 				lens.append(len(max([x[i] for x in rows] + [headers[i]],key=lambda x:len(str(x)))))
 			formats = []
 			hformats = []
@@ -201,7 +218,6 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 				else:
 					formats.append("%%-%ds" % lens[i])
 				hformats.append("%%-%ds" % lens[i])
-			pattern = " | ".join(formats).encode('utf-8')
 			hpattern = " | ".join(hformats)
 			separator = "-+-".join(['-' * n for n in lens])
 			out += hpattern % tuple(headers)

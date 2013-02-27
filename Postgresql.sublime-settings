@@ -1,0 +1,21 @@
+{
+	"current_connection" : "",
+
+	// Showing confirmation dialog with connection question
+	"show_confirm" : false,
+
+	"connections" :
+		{
+			"example":
+				{
+					"user" : "user",
+					"host" :"localhost",
+					"port" : 5432,
+					"database" : "postgres",
+					"password" : "password",
+					"socket_timeout" : 5,
+					"schema" : "public"
+				}
+		}
+
+}

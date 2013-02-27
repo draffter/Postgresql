@@ -1,4 +1,4 @@
 [
-	{ "keys": ["ctrl+shift+/"], "command": "postgresql" },
+	{ "keys": ["ctrl+shift+enter"], "command": "postgresql" },
 	{ "keys": ["ctrl+shift+q"], "command": "connectionchange"}
 ]
