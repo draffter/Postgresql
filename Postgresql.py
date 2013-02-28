@@ -135,6 +135,27 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 					pass
 		return False
 
+	# wywoływana, gdy w pierszwym wierszu wyników nie ma danych
+	# w kolumnie, do określenia typu sprawdza zawartość kolumny
+	# dla kolejnych wierszy
+	def searchType(self, result, i):
+		for row in result:
+			t = self.convertTypes(type(row[i]))
+			if t != 'unknown':
+				return t
+		return t
+
+	# pobiera typy kolumn
+	def getColumnsTypes(self, result):
+		cTypes = []
+		for i, col in enumerate(result[0]):
+			newType = self.convertTypes(type(col))
+			if newType == 'unknown':
+				newType = self.searchType(result, i)
+			cTypes.append(str('<' + newType + '>'))
+		return cTypes
+
+	# pobiera nazwy kolumn
 	def getColumnNames(self):
 		cNames = []
 		for c in self.cursor.description:
@@ -177,6 +198,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			nName.append(name)
 		return nName
 
+	# dekodowanie microsekund na interwał
 	def intervalToHis(self, microseconds):
 		s=microseconds/1000000
 		i,s=divmod(s,60)
@@ -187,24 +209,26 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 	def prepareOutView(self, result):
 		data = []
 		cNames = self.getColumnNames()
+		cTypes = self.getColumnsTypes(result)
 		RowTable = namedtuple('RowTable',self.prepareColumnNames(cNames))
+		data.append(RowTable(*cTypes))
 		ret = ''
 		for row in result:
 			sRow = []
 			for col in row:
-				# print type(col)
+				print type(col)
 				if col == None:
 					sRow.append(' ')
 				else:
-
 					if isinstance(col, str):
 						sRow.append(col)
+					elif isinstance(col, pg8000.types.Interval):
+						interval = self.intervalToHis(col.microseconds)
+						sRow.append(interval.encode('utf-8'))
+					elif isinstance(col, unicode):
+						sRow.append(col.encode('utf-8'))
 					else:
-						if isinstance(col, pg8000.types.Interval):
-							interval = self.intervalToHis(col.microseconds)
-							sRow.append(interval.encode('utf-8'))
-						else:
-							sRow.append(str(col).encode('utf-8'))
+						sRow.append(str(col).encode('utf-8'))
 			data.append(RowTable(*sRow))
 		ret = self.pprinttable(data)
 		return ret
@@ -214,9 +238,9 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		out = ''
 		out += ("Result for connection: " + self.connectionName +"\n").encode('utf-8')
 		out += ("Affected rows: " + str(self.cursor.rowcount) + "\n\n").encode('utf-8')
-
 		if len(rows) > 0:
 			headers = rows[0]._fields
+			types = rows[0]
 			lens = []
 			for i in range(len(rows[0])):       #szerokosc kolumn
 				lens.append(len(max([x[i] for x in rows] + [headers[i]],key=lambda x:len(str(x)))))
@@ -232,18 +256,58 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			separator = "-+-".join(['-' * n for n in lens])
 			out += hpattern % tuple(headers)
 			out += "\n"
-			out += separator
-			out += "\n"
-			for line in rows:
-				i =0
-				for col in line:
-					lgh = len(col.decode('utf-8'))
-					out += col
-					for space in range(lgh, lens[i]):
-						out += ' '
-					i = i+1
-					if i != len(line):
-						out += ' | '
-				out += "\n"
+			for cnt, line in enumerate(rows):
+				if cnt == 0:
+					out += hpattern % tuple(types)
+					out += "\n"
+					out += separator
+					out += "\n"
+				else:
+					i =0
+					for col in line:
+						lgh = len(col.decode('utf-8'))
+						out += col
+						for space in range(lgh, lens[i]):
+							out += ' '
+						i = i+1
+						if i != len(line):
+							out += ' | '
+					out += "\n"
 		return out
 
+	def convertTypes(self, typeIn):
+		print typeIn
+		orgType = typeIn
+		if '<type' in str(typeIn):
+			typeIn = str(typeIn).replace("<type ", '').replace("'","").replace(">","")
+		if '<class' in str(typeIn):
+			typeIn = str(typeIn).replace("<class ", '').replace("'","").replace(">","")
+
+		pgtypes = {
+			'bool':'bool',
+			'int':'int4',
+			'long':'numeric',
+			'str':'text',
+			'unicode':'text',
+			'float':'float8',
+			'decimal.Decimal':'numeric',
+			'pg8000.types.Bytea':'bytea',
+			'datetime.datetime (wo/ tzinfo)':'timestamp without time zone',
+			'datetime.datetime (w/ tzinfo)':'timestamp with time zone',
+			'datetime.date':'date',
+			'datetime.datetime':'time without time zone',
+			'datetime.time':'time without time zone',
+			'pg8000.types.Interval':'interval',
+			'None':'NULL',
+			'list of int':'INT4[]',
+			'list of float':'FLOAT8[]',
+			'list of bool':'BOOL[]',
+			'list of str':'TEXT[]',
+			'list of unicode':'TEXT[]',
+			'NoneType':'unknown'
+		}
+
+		if typeIn in pgtypes:
+			return pgtypes[typeIn]
+
+		return orgType
