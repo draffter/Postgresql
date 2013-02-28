@@ -2,7 +2,7 @@
 import sublime, sublime_plugin
 import pg8000
 import os
-import re
+import datetime
 import json
 import fnmatch
 import shutil
@@ -177,6 +177,12 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			nName.append(name)
 		return nName
 
+	def intervalToHis(self, microseconds):
+		s=microseconds/1000000
+		i,s=divmod(s,60)
+		h,i=divmod(i,60)
+		return "%02d:%02d:%02d" % (h,i,s)
+
 	# przygotowanie tabeli
 	def prepareOutView(self, result):
 		data = []
@@ -186,15 +192,19 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		for row in result:
 			sRow = []
 			for col in row:
+				# print type(col)
 				if col == None:
 					sRow.append(' ')
 				else:
-					if isinstance(col, unicode):
-						sRow.append(col.encode('utf-8'))
-					elif isinstance(col, str):
+
+					if isinstance(col, str):
 						sRow.append(col)
 					else:
-						sRow.append(str(col).encode('utf-8'))
+						if isinstance(col, pg8000.types.Interval):
+							interval = self.intervalToHis(col.microseconds)
+							sRow.append(interval.encode('utf-8'))
+						else:
+							sRow.append(str(col).encode('utf-8'))
 			data.append(RowTable(*sRow))
 		ret = self.pprinttable(data)
 		return ret
