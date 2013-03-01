@@ -118,11 +118,12 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 				else:
 					return None
 			else:
-				self.cursor.execute(sql.encode('utf-8'))
+				print type(sql)
+				self.cursor.execute(sql)#.encode('utf-8'))
 				self.connection.commit()
 		except Exception, e:
 			self.disconnect()
-			s = "Error {0}".format(str(e)) # string
+			s = "Error {0}".format(str(e).decode("utf-8")) # string
 			utf8str = s.encode("utf-8")
 			self.showResult('Error in SQL' + utf8str + "\nSQL:\n\t'" + sql.encode('utf-8') +"'", False)
 			return None
@@ -195,7 +196,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			if cnt[name] > 1:
 				_name = name + "_"+str((cnt[name]-1))
 				name = _name
-			nName.append(name)
+			nName.append(name.replace(" ","_"))
 		return nName
 
 	# dekodowanie microsekund na interwał
@@ -216,7 +217,6 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		for row in result:
 			sRow = []
 			for col in row:
-				print type(col)
 				if col == None:
 					sRow.append(' ')
 				else:
@@ -276,7 +276,6 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 		return out
 
 	def convertTypes(self, typeIn):
-		print typeIn
 		orgType = typeIn
 		if '<type' in str(typeIn):
 			typeIn = str(typeIn).replace("<type ", '').replace("'","").replace(">","")
