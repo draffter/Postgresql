@@ -111,7 +111,7 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			self.cursor.execute("set search_path = '"+ self.connParams['schema'] +"'")
 
 		try:
-			if self.settings.get('show_confirm') == True:
+			if self.settings.get('show_confirm') == True or ('warn' in self.connParams and self.connParams['warn'] == True):
 				if sublime.ok_cancel_dialog("You are using '"+self.connectionName+"' connection.\nContinue?"):
 					self.cursor.execute(sql.encode('utf-8'))
 					self.connection.commit()
