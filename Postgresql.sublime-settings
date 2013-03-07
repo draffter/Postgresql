@@ -14,41 +14,9 @@
 					"database" : "postgres",
 					"password" : "password",
 					"socket_timeout" : 5,
-					"schema" : "public"
-				},
-			"localhost":
-				{
-					"user" : "sn0",
-					"host" :"localhost",
-					"port" : 5432,
-					"database" : "postgres",
-					"password" : "haslo123",
-					"socket_timeout" : 5,
-					"schema" : ""
-				},
-			"pwi2_devel":
-				{
-					"user" : "sn0",
-					"host" :"postgre",
-					"port" : 5432,
-					"database" : "pwi2_devel",
-					"password" : "n0wysl4w3k!",
-					"socket_timeout" : 5,
-					"schema" : "pwi2",
-					"warn" : true
-				},
-			"pwi2_produkcja":
-				{
-					"user" : "sn0",
-					"host" :"dbpwi",
-					"port" : 5432,
-					"database" : "pwi2",
-					"password" : "n0wysl4w3k!",
-					"socket_timeout" : 5,
-					"schema" : "pwi2",
-					"warn" : true
+					"schema" : "public",
+					"warn" : false
 				}
-
 		}
 
 }
