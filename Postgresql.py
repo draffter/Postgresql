@@ -10,21 +10,6 @@ from collections import namedtuple
 import collections
 
 
-class ConnectionchangeCommand(PostgresqlCommand):
-	settings = None
-	def run(self, view):
-		self.settings = sublime.load_settings('Postgresql.sublime-settings')
-		self.getConnections()
-
-class EditconnectionCommand(PostgresqlCommand):
-	settings = None
-	def run(self, view):
-		self.openPrefConnFile()
-	# otwiera plik z konfiguracją połączenia
-	def openPrefConnFile(self):
-		default_settings_path = os.path.join(sublime.packages_path(), 'Postgresql', 'Postgresql.sublime-settings')
-		sublime.active_window().open_file(default_settings_path)
-
 class PostgresqlCommand(sublime_plugin.TextCommand):
 	settingsPath = ''
 	connection = None       #ConnectionWrapper
@@ -309,3 +294,19 @@ class PostgresqlCommand(sublime_plugin.TextCommand):
 			return pgtypes[typeIn]
 
 		return orgType
+
+
+class ConnectionchangeCommand(PostgresqlCommand):
+	settings = None
+	def run(self, view):
+		self.settings = sublime.load_settings('Postgresql.sublime-settings')
+		self.getConnections()
+
+class EditconnectionCommand(PostgresqlCommand):
+	settings = None
+	def run(self, view):
+		self.openPrefConnFile()
+	# otwiera plik z konfiguracją połączenia
+	def openPrefConnFile(self):
+		default_settings_path = os.path.join(sublime.packages_path(), 'Postgresql', 'Postgresql.sublime-settings')
+		sublime.active_window().open_file(default_settings_path)
